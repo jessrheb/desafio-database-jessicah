@@ -3,7 +3,7 @@ book_id SERIAL PRIMARY KEY,
 title VARCHAR(100) NOT NULL,
 author VARCHAR(100) NOT NULL,
 genre VARCHAR(50) NOT NULL,
-published_year INT NOT NULL
+published_year INTEGER NOT NULL
 );
 
 CREATE TABLE Users (
@@ -13,11 +13,9 @@ email VARCHAR(100) NOT NULL UNIQUE
 );
 
 CREATE TABLE Loans (
-loan_id SERIAL PRIMARY KEY,
-book_id INTEGER UNIQUE REFERENCES
-Books(book_id),
-user_id INTEGER REFERENCES
-Users(user_id),
+loan_id SERIAL PRIMARY KEY, 
+book_id INTEGER REFERENCES Books(book_id), 
+user_id INTEGER REFERENCES Users(user_id), 
 loan_date DATE,
 return_date DATE
 );
@@ -47,16 +45,25 @@ INSERT INTO Books (title, author, genre, published_year) VALUES
 
 -- Atualizar informações de livros existentes:
 UPDATE Books
-SET genre = 'Satire' WHERE title = 'Don Quixote';
+SET genre = 'Satire' 
+WHERE title = 'Don Quixote';
 
 -- Excluir livros do catálogo:
-DELETE FROM Books WHERE published_year < 1800;
+DELETE FROM Books 
+WHERE published_year < 1800;
 
 -- Buscar livros no catálogo por título, autor, gênero, etc.:
-SELECT * FROM Books WHERE title = 'One Hundred Years of Solitude';
-SELECT * FROM Books WHERE author = 'J.R.R. Tolkien';
-SELECT * FROM Books WHERE genre = 'Fantasy';
-SELECT * FROM Books WHERE published_year > 1900;
+SELECT * FROM Books 
+WHERE title = 'One Hundred Years of Solitude';
+
+SELECT * FROM Books 
+WHERE author = 'J.R.R. Tolkien';
+
+SELECT * FROM Books 
+WHERE genre = 'Fantasy';
+
+SELECT * FROM Books 
+WHERE published_year > 1900;
 
 -- Adicionar novos usuários:
 INSERT INTO Users (name, email) VALUES
@@ -73,14 +80,19 @@ INSERT INTO Users (name, email) VALUES
 
 -- Atualizar informações de usuários existentes:
 UPDATE Users
-SET email = 'chris.lee@example.com' WHERE name = 'Christopher Lee';
+SET email = 'chris.lee@example.com' 
+WHERE name = 'Christopher Lee';
 
 -- Excluir usuários:
-DELETE FROM Users WHERE user_id = 4;
+DELETE FROM Users 
+WHERE user_id = 4;
 
 -- Buscar usuários por nome, email, etc.:
-SELECT * FROM Users WHERE name = 'Charlotte Walker';
-SELECT * FROM Users WHERE email = 'amelia.allen@example.com';
+SELECT * FROM Users 
+WHERE name = 'Charlotte Walker';
+
+SELECT * FROM Users 
+WHERE email = 'amelia.allen@example.com';
 
 -- Registrar empréstimos de livros:
 INSERT INTO Loans (book_id, user_id, loan_date, return_date) VALUES
@@ -105,20 +117,50 @@ FROM (
 WHERE Loans.loan_id = data.loan_id;
 
 -- Verificar a disponibilidade de um livro antes de realizar um empréstimo:
-SELECT Books.title, Books.author FROM Books
-FULL JOIN Loans ON Books.book_id = Loans.book_id WHERE Loans.loan_id IS NULL OR Loans.return_date IS NOT NULL;
+SELECT Books.title, Books.author 
+FROM Books
+FULL JOIN Loans ON Books.book_id = Loans.book_id 
+WHERE Loans.loan_id IS NULL OR Loans.return_date IS NOT NULL;
 
 -- Gerar relatórios de livros emprestados e devolvidos:
-SELECT Books.title, Books.author, Loans.loan_date, Loans.return_date FROM Books
-INNER JOIN Loans ON Books.book_id = Loans.book_id WHERE Loans.loan_date IS NOT NULL AND Loans.return_date IS NOT NULL;
+SELECT Books.title, Books.author, Loans.loan_date, Loans.return_date 
+FROM Books
+INNER JOIN Loans ON Books.book_id = Loans.book_id 
+WHERE Loans.loan_date IS NOT NULL AND Loans.return_date IS NOT NULL;
 
 -- Gerar relatórios de livros atualmente emprestados:
-SELECT Books.title, Books.author, Users.name, Loans.loan_date FROM Books
+SELECT Books.title, Books.author, Users.name, Loans.loan_date 
+FROM Books
 INNER JOIN Loans ON Books.book_id = Loans.book_id
 INNER JOIN Users ON Users.user_id = Loans.user_id
 WHERE Loans.loan_date IS NOT NULL AND Loans.return_date IS NULL;
 
 -- Gerar relatórios de usuários com mais empréstimos:
-SELECT Users.name, COUNT(Loans.user_id) AS total_loans FROM Loans
+SELECT Users.name, COUNT(Loans.user_id) AS total_loans 
+FROM Loans
 JOIN Users ON Loans.user_id = Users.user_id
 GROUP BY Users.name ORDER BY total_loans DESC LIMIT 1;
+
+-- Bônus: Checar disponibilidade de um livro e realizar empréstimo:
+CREATE OR REPLACE PROCEDURE check_loan(p_book_id INTEGER, p_user_id INTEGER)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_available BOOLEAN;
+BEGIN
+    SELECT NOT EXISTS (
+        SELECT 1 FROM Loans 
+        WHERE book_id = p_book_id AND return_date IS NULL
+    ) INTO v_available;
+
+    IF v_available THEN
+        INSERT INTO Loans (book_id, user_id, loan_date, return_date)
+        VALUES (p_book_id, p_user_id, CURRENT_DATE, NULL);
+        COMMIT;
+    ELSE
+        RAISE NOTICE 'The selected book is not available for loans.';
+    END IF;
+END;
+$$;
+
+CALL check_loan(15, 6);
